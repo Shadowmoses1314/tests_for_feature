@@ -1,1 +1,7 @@
 aiohttp
+fastapi 
+uvicorn
+httpx
+pytest
+pytest-asyncio
+asynctest

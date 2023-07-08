@@ -1,35 +1,30 @@
-import asyncio
-from unittest.mock import MagicMock, patch
 import pytest
-import aiohttp
-from logs import logs
+import httpx
+
+from logs_func import logs
 
 @pytest.mark.asyncio
 async def test_logs():
-    cont = "container_name"
-    name = "container_name"
+    cont = '92b52be58081'
+    name = 'docker_back'
 
-    # Создаем фейковый объект ответа от сервера
-    fake_response = MagicMock()
-    fake_response.content = [b"Log line 1\n", b"Log line 2\n"]
+    # Create mock data
+    mock_content = [b'log 1\n', b'log 2\n', b'log 3\n']
 
-    # Создаем фейковый объект сессии
-    fake_session = MagicMock()
+    # Create mock response
+    mock_response = httpx.Response(200, content=mock_content)
 
-    # Мокаем класс ClientSession и переопределяем методы
-    with patch('logs.aiohttp.ClientSession', return_value=fake_session):
-        # Запускаем функцию logs
-        await logs(cont, name)
+    # Setup mock transport
+    mock_transport = httpx.MockTransport(responses=[mock_response])
 
-        # Проверяем, что функция ClientSession создана с правильными параметрами
-        fake_session.assert_called_once_with(connector=aiohttp.UnixConnector(path="/var/run/docker.sock"))
+    # Start function
+    async with httpx.AsyncClient(transport=mock_transport) as client:
+        await logs(cont, name, client)
 
-        # Проверяем, что функция get вызвана с правильным URL
-        fake_session.return_value.get.assert_called_once_with(f"http://xx/containers/{cont}/logs?follow=1&stdout=1")
+    # Check request
+    request = mock_transport.await_request()
+    assert request.url == f'http://xx/containers/{cont}/logs?follow=1&stdout=1'
 
-        # Проверяем, что функция print была вызвана с ожидаемыми аргументами
-        expected_print_calls = [
-            call(name, b"Log line 1\n"),
-            call(name, b"Log line 2\n")
-        ]
-        assert print.call_args_list == expected_print_calls
+    # Check content iteration
+    assert mock_response.iter_raw.call_count == 3
+    mock_response.iter_raw.assert_called_with(decode_content=False)
